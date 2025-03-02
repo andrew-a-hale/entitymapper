@@ -5,11 +5,13 @@ pub fn create_cmd() -> Command {
     Command::new("create")
         .about("create stub for file")
         .arg(arg!(<MAPPING> "mapping file").required(true))
-        .arg(arg!(<WEBHOOK_TOPIC> "").required(true))
+        .arg(arg!(<WEBHOOK_TOPIC> "webhook topic").required(true))
         .arg_required_else_help(true)
 }
 
-pub fn handler(matches: &ArgMatches, webhook: &mut data::Webhook) {
+pub fn handler(matches: &ArgMatches, db: &mut data::Repository, webhook: &mut data::Webhook) {
+    let rows = db.database.query("select 1 as id");
+    println!("{:?}", rows);
     let topic = matches
         .get_one::<String>("WEBHOOK_TOPIC")
         .expect("required");

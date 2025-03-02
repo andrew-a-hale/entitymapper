@@ -5,7 +5,6 @@ mod data;
 mod kafka;
 mod load;
 mod postgres;
-mod stub;
 
 fn cli() -> Command {
     Command::new("em")
@@ -17,7 +16,6 @@ fn cli() -> Command {
         .arg(arg!(<PASSWORD> "password").required(true))
         .arg(arg!(<FQN_TABLE> "database fully qualified name for destination table").required(true))
         .subcommand(load::create_cmd())
-        .subcommand(stub::create_cmd())
         .subcommand(create::create_cmd())
 }
 
@@ -29,8 +27,7 @@ fn main() {
 
     match matches.subcommand() {
         Some(("load", sub_matches)) => load::handler(sub_matches, db),
-        Some(("stub", _)) => stub::handler(db),
-        Some(("create", sub_matches)) => create::handler(sub_matches, wh),
+        Some(("create", sub_matches)) => create::handler(sub_matches, db, wh),
         _ => unreachable!(),
     }
 }

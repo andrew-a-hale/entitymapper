@@ -1,6 +1,8 @@
 use crate::data;
 use clap::ArgMatches;
-use postgres::{Client, NoTls};
+use postgres::{Client, Error, NoTls, Row};
+use std::ffi::OsStr;
+use std::path;
 
 pub struct Provider {
     pub uri: String,
@@ -9,7 +11,18 @@ pub struct Provider {
 }
 
 impl data::Database for Provider {
-    fn load(&self) -> bool {
+    fn load(&self, filepath: String) -> bool {
+        let file = path::Path::new(&filepath);
+        let ext = file.extension().and_then(OsStr::to_str);
+
+        match ext {
+            Some("csv") => println!("csv file: {}", file.to_str().unwrap()),
+            Some("json") => println!("json file: {}", file.to_str().unwrap()),
+            Some("jsonl") => println!("jsonl file: {}", file.to_str().unwrap()),
+            Some("parquet") => println!("parquet file: {}", file.to_str().unwrap()),
+            _ => unreachable!(),
+        }
+
         println!("{}", self.fqn_table);
         true
     }
@@ -20,6 +33,10 @@ impl data::Database for Provider {
 
     fn get_destination(&self) -> String {
         self.fqn_table.clone()
+    }
+
+    fn query(&mut self, sql: &str) -> Result<Vec<Row>, Error> {
+        self.client.query(&sql.to_string(), &[])
     }
 }
 

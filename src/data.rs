@@ -1,9 +1,12 @@
+use postgres::{Error, Row};
+
 pub struct Repository {
     pub database: Box<dyn Database>,
 }
 
 pub trait Database {
-    fn load(&self) -> bool;
+    fn load(&self, filepath: String) -> bool;
+    fn query(&mut self, sql: &str) -> Result<Vec<Row>, Error>;
     fn get_uri(&self) -> String;
     fn get_destination(&self) -> String;
 }
