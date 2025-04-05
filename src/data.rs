@@ -1,3 +1,4 @@
+use arrow::array::RecordBatch;
 use postgres::{Error, Row};
 
 pub struct Repository {
@@ -5,10 +6,10 @@ pub struct Repository {
 }
 
 pub trait Database {
-    fn load(&self, filepath: String) -> bool;
+    fn load(&mut self, batch: RecordBatch);
     fn query(&mut self, sql: &str) -> Result<Vec<Row>, Error>;
-    fn get_uri(&self) -> String;
-    fn get_destination(&self) -> String;
+    // fn get_uri(&self) -> String;
+    // fn get_destination(&self) -> String;
 }
 
 pub struct Webhook {
