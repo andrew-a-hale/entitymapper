@@ -1,6 +1,8 @@
 use arrow::array::RecordBatch;
 use postgres::{Error, Row};
 
+use crate::map;
+
 pub struct Repository {
     pub database: Box<dyn Database>,
 }
@@ -8,8 +10,13 @@ pub struct Repository {
 pub trait Database {
     fn load(&mut self, batch: RecordBatch);
     fn query(&mut self, sql: &str) -> Result<Vec<Row>, Error>;
-    // fn get_uri(&self) -> String;
-    // fn get_destination(&self) -> String;
+    fn to_messages(&mut self, schema: map::Schema) -> Vec<Message>;
+}
+
+#[derive(Debug, Clone)]
+pub struct Message {
+    pub key: String,
+    pub value: String,
 }
 
 pub struct Webhook {
@@ -17,7 +24,8 @@ pub struct Webhook {
 }
 
 pub trait Hook {
-    fn send(&self, key: &str, value: &str) -> bool;
+    fn _send(&self, msg: Message) -> bool;
+    fn send(&self, msgs: Vec<Message>) -> bool;
     fn set_topic(&mut self, topic: String);
     fn get_topic(&self) -> String;
 }

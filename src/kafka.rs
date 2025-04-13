@@ -9,7 +9,7 @@ use rdkafka::{
 
 pub struct Provider {
     pub topic: Option<String>,
-    pub client: FutureProducer,
+    pub producer: FutureProducer,
 }
 
 pub fn from_config(file_path: std::path::PathBuf) -> data::Webhook {
@@ -29,20 +29,29 @@ pub fn from_config(file_path: std::path::PathBuf) -> data::Webhook {
 
     data::Webhook {
         hook: Box::new(Provider {
-            client: producer,
+            producer,
             topic: None,
         }),
     }
 }
 
 impl data::Hook for Provider {
-    fn send(&self, key: &str, value: &str) -> bool {
+    fn _send(&self, msg: data::Message) -> bool {
         let topic = self.get_topic();
-        let record = FutureRecord::to(&topic).key(key).payload(value);
-        block_on(self.client.send(record, Duration::from_secs(0))).expect("failed to deliver");
-        println!("sent message: {}: {}", key, value);
+        let record = FutureRecord::to(&topic).key(&msg.key).payload(&msg.value);
+        block_on(self.producer.send(record, Duration::from_secs(0))).expect("failed to deliver");
+        println!("sent message: {}: {}", msg.key, msg.value);
 
         true
+    }
+
+    fn send(&self, msgs: Vec<data::Message>) -> bool {
+        let sent = msgs
+            .iter()
+            .map(|msg| self._send(msg.clone()))
+            .collect::<Vec<bool>>();
+
+        !sent.contains(&false)
     }
 
     fn set_topic(&mut self, topic: String) {

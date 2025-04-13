@@ -28,6 +28,7 @@ pub fn handle_file(path: &Path, mapping: &map::Schema) -> Option<RecordBatch> {
     match path.extension() {
         Some(x) if x == "csv" => handle_csv(buf, mapping),
         Some(x) if x == "json" => handle_json(buf, mapping),
+        Some(x) if x == "jsonl" => handle_json(buf, mapping),
         Some(_) => unimplemented!(),
         None => None,
     }

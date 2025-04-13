@@ -1,13 +1,15 @@
 use crate::data;
-use arrow::array::{PrimitiveArray, StringArray};
-use arrow::datatypes::{DataType, Float64Type};
-use arrow::{array::RecordBatch, datatypes::SchemaRef};
+use crate::map;
+use arrow::array::RecordBatch;
+use arrow::array::{Date64Array, Int64Array, PrimitiveArray, StringArray};
+use arrow::datatypes;
 use clap::ArgMatches;
 use postgres::{Client, Error, NoTls, Row};
+use serde_json::json;
+use std::collections::HashMap;
 use std::fmt::Write;
 
 pub struct Provider {
-    // pub uri: String,
     pub fqn_table: String,
     pub client: Client,
 }
@@ -38,14 +40,28 @@ impl data::Database for Provider {
                     "{}{}",
                     sep,
                     match batch.column(col).data_type().clone() {
-                        DataType::Float64 => batch
+                        datatypes::DataType::Int64 => batch
                             .column(col)
                             .as_any()
-                            .downcast_ref::<PrimitiveArray<Float64Type>>()
+                            .downcast_ref::<Int64Array>()
                             .expect("failed to downcast")
                             .value(row)
                             .to_string(),
-                        DataType::Utf8 => {
+                        datatypes::DataType::Float64 => batch
+                            .column(col)
+                            .as_any()
+                            .downcast_ref::<PrimitiveArray<datatypes::Float64Type>>()
+                            .expect("failed to downcast")
+                            .value(row)
+                            .to_string(),
+                        datatypes::DataType::Date64 => batch
+                            .column(col)
+                            .as_any()
+                            .downcast_ref::<Date64Array>()
+                            .expect("failed to downcast")
+                            .value(row)
+                            .to_string(),
+                        datatypes::DataType::Utf8 => {
                             let v = batch
                                 .column(col)
                                 .as_any()
@@ -72,20 +88,145 @@ impl data::Database for Provider {
         });
     }
 
-    // fn get_uri(&self) -> String {
-    //     self.uri.clone()
-    // }
-
-    // fn get_destination(&self) -> String {
-    //     self.fqn_table.clone()
-    // }
-
     fn query(&mut self, sql: &str) -> Result<Vec<Row>, Error> {
         self.client.query(&sql.to_string(), &[])
     }
+
+    fn to_messages(&mut self, schema: map::Schema) -> Vec<data::Message> {
+        let res = self.query(schema.get_sql_source());
+        let mut messages: Vec<data::Message> = vec![];
+        match res {
+            Err(msg) => eprintln!("failed to get source: {}", msg),
+            Ok(rows) => {
+                rows.iter().for_each(|row| {
+                    row_into_messages(row, &schema, &mut messages);
+                });
+            }
+        }
+
+        messages
+    }
 }
 
-fn schema_to_ddl(fqn_name: &String, schema: SchemaRef) -> Vec<String> {
+type Label = String;
+type Value = String;
+type DataType = String;
+type MessageField = (Label, Value, DataType);
+
+fn row_into_messages(row: &Row, schema: &map::Schema, messages: &mut Vec<data::Message>) {
+    let mut entities: HashMap<String, Vec<MessageField>> = HashMap::new();
+    let mut entity_ids: HashMap<String, String> = HashMap::new();
+    let mut relationships: HashMap<String, Vec<MessageField>> = HashMap::new();
+
+    // Column { name: "type", table_oid: Some(32780), column_id: Some(9), type: Varchar }
+    // Field { name: "type", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {"entity": "REL.Person!0-Person!1.type", "label": "type", "dataType": "String"} }
+
+    schema
+        .fields
+        .fields()
+        .iter()
+        .enumerate()
+        .for_each(|(i, field)| {
+            let col_type = row.columns().get(i).map(|c| c.type_().name()).unwrap();
+            let value = match col_type {
+                "varchar" => row.get::<usize, String>(i),
+                "int4" => row.get::<usize, i32>(i).to_string(),
+                "int8" => row.get::<usize, i64>(i).to_string(),
+                _ => unimplemented!(),
+            };
+
+            let label = field.metadata().get("label").unwrap();
+            let data_type = field.metadata().get("dataType").unwrap();
+            match field.metadata().get("entity") {
+                Some(x) if x.contains("-") => {
+                    relationships
+                        .entry(x.clone())
+                        .and_modify(|x| x.push((label.clone(), value.clone(), data_type.clone())))
+                        .or_insert(vec![(label.clone(), value, data_type.clone())]);
+                }
+                Some(x) => {
+                    if label == "sourceId" {
+                        entity_ids.insert(x.clone(), value.clone());
+                    }
+                    entities
+                        .entry(x.clone())
+                        .and_modify(|x| x.push((label.clone(), value.clone(), data_type.clone())))
+                        .or_insert(vec![(label.clone(), value, data_type.clone())]);
+                }
+                None => {
+                    unimplemented!()
+                }
+            };
+        });
+
+    entities.iter().for_each(|(k, v)| {
+        let tmp = k.replace("!", ".");
+        let mut tmp_iter = tmp.split(".");
+        let type_ = tmp_iter.next().unwrap();
+        let sub_type = tmp_iter.next().unwrap();
+        let set_id = tmp_iter.next().unwrap_or("");
+        let id = entity_ids.get(k).unwrap();
+        let key = format!("{}.{}.{}", type_, sub_type, id);
+
+        let props: serde_json::Value = v
+            .iter()
+            .map(|prop| {
+                json!({
+                    "label": prop.0,
+                    "value": prop.1,
+                    "dataType": prop.2,
+                })
+            })
+            .collect();
+
+        messages.push(data::Message {
+            key,
+            value: json!({
+                "fqn": k,
+                "type": type_,
+                "subType": sub_type,
+                "setId": set_id,
+                "sourceId": id,
+                "props": props,
+            })
+            .to_string(),
+        });
+    });
+
+    schema.relationships.iter().for_each(|x| {
+        let reference_split: Vec<&str> = x.reference.split("-").collect();
+        let from = reference_split.first().to_owned().unwrap();
+        let to = &reference_split.last().unwrap().to_owned();
+        let from_id = entity_ids.get(*from).unwrap();
+        let to_id = entity_ids.get(*to).unwrap();
+        let key = format!("{}.{}-{}", x.reference, from_id, to_id);
+        let props: serde_json::Value = relationships
+            .get(&x.reference)
+            .unwrap()
+            .iter()
+            .map(|prop| {
+                json!({
+                    "label": prop.0,
+                    "value": prop.1,
+                    "dataType": prop.2,
+                })
+            })
+            .collect();
+
+        messages.push(data::Message {
+            key,
+            value: json!({
+                "relType": x.label,
+                "fromId": from_id,
+                "toId": to_id,
+                "props": props,
+            })
+            .to_string(),
+        });
+    })
+}
+
+fn schema_to_ddl(fqn_name: &String, schema: datatypes::SchemaRef) -> Vec<String> {
     let mut create = String::new();
     writeln!(
         create,
@@ -106,10 +247,11 @@ fn schema_to_ddl(fqn_name: &String, schema: SchemaRef) -> Vec<String> {
         .map(|(i, x)| {
             let leading = if i == 0 { "" } else { ", " };
             match x.data_type() {
-                DataType::Utf8 => writeln!(ddl, "\t{}{} varchar", leading, x.name()),
-                DataType::Boolean => writeln!(ddl, "\t{}{} bool", leading, x.name()),
-                DataType::Int64 => writeln!(ddl, "\t{}{} int", leading, x.name()),
-                DataType::Float64 => writeln!(ddl, "\t{}{} float", leading, x.name()),
+                datatypes::DataType::Utf8 => writeln!(ddl, "\t{}{} varchar", leading, x.name()),
+                datatypes::DataType::Boolean => writeln!(ddl, "\t{}{} bool", leading, x.name()),
+                datatypes::DataType::Int64 => writeln!(ddl, "\t{}{} int", leading, x.name()),
+                datatypes::DataType::Float64 => writeln!(ddl, "\t{}{} float", leading, x.name()),
+                datatypes::DataType::Date64 => writeln!(ddl, "\t{}{} bigint", leading, x.name()),
                 _ => unimplemented!(),
             }
         })
@@ -147,10 +289,6 @@ pub fn from_args(matches: &ArgMatches) -> data::Repository {
     .expect("failed to connect to postgres");
 
     data::Repository {
-        database: Box::new(Provider {
-            // uri,
-            fqn_table,
-            client,
-        }),
+        database: Box::new(Provider { fqn_table, client }),
     }
 }

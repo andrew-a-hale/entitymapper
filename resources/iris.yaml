@@ -1,20 +1,16 @@
 fields:
 - label: sepal_length
-  data_type: Float64
+  dataType: Float
   entity: OBJECT.Plant
 - label: sepal_width
-  data_type: Float64
+  dataType: Float
   entity: OBJECT.Plant
 - label: petal_length
-  data_type: Float64
+  dataType: Float
   entity: OBJECT.Plant
 - label: petal_width
-  data_type: Float64
+  dataType: Float
   entity: OBJECT.Plant
 - label: species
-  data_type: String
+  dataType: String
   entity: OBJECT.Plant
-relationships:
-- "(PERSON:Person)-[RESIDES_AT]->(LOCATION:Address)"
-source:
-  sql: select * from postgres.schema.table

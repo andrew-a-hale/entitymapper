@@ -13,14 +13,13 @@ pub fn handler(
     matches: &ArgMatches,
     db: &mut data::Repository,
     webhook: &mut data::Webhook,
-    _mapping: map::Schema,
+    mapping: map::Schema,
 ) {
-    let rows = db.database.query("select 1 as id");
-    println!("{:?}", rows);
     let topic = matches
         .get_one::<String>("WEBHOOK_TOPIC")
         .expect("required");
 
+    let messages = db.database.to_messages(mapping);
     webhook.hook.set_topic(topic.clone());
-    webhook.hook.send("hello", "world");
+    webhook.hook.send(messages);
 }
