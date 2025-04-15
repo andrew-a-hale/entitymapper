@@ -37,7 +37,7 @@ impl data::Database for Provider {
                 let sep = if col == 0 { "" } else { ", " };
                 write!(
                     dml,
-                    "{}{}",
+                    "{}'{}'",
                     sep,
                     match batch.column(col).data_type().clone() {
                         datatypes::DataType::Int64 => batch
@@ -61,16 +61,14 @@ impl data::Database for Provider {
                             .expect("failed to downcast")
                             .value(row)
                             .to_string(),
-                        datatypes::DataType::Utf8 => {
-                            let v = batch
-                                .column(col)
-                                .as_any()
-                                .downcast_ref::<StringArray>()
-                                .expect("failed to downcast")
-                                .value(row)
-                                .to_string();
-                            format!("'{}'", v)
-                        }
+                        datatypes::DataType::Utf8 => batch
+                            .column(col)
+                            .as_any()
+                            .downcast_ref::<StringArray>()
+                            .expect("failed to downcast")
+                            .value(row)
+                            .to_string()
+                            .replace("'", "''"),
                         _ => unimplemented!(),
                     }
                 )
@@ -117,9 +115,6 @@ fn row_into_messages(row: &Row, schema: &map::Schema, messages: &mut Vec<data::M
     let mut entities: HashMap<String, Vec<MessageField>> = HashMap::new();
     let mut entity_ids: HashMap<String, String> = HashMap::new();
     let mut relationships: HashMap<String, Vec<MessageField>> = HashMap::new();
-
-    // Column { name: "type", table_oid: Some(32780), column_id: Some(9), type: Varchar }
-    // Field { name: "type", data_type: Utf8, nullable: false, dict_id: 0, dict_is_ordered: false, metadata: {"entity": "REL.Person!0-Person!1.type", "label": "type", "dataType": "String"} }
 
     schema
         .fields

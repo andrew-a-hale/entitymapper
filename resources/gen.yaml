@@ -1,0 +1,46 @@
+fields:
+- label: sourceId
+  dataType: String
+  reference: PERSON.Person!0
+- label: age
+  dataType: Int
+  reference: PERSON.Person!0
+- label: name
+  dataType: String
+  reference: PERSON.Person!0
+- label: addressId
+  labelOverride: sourceId
+  dataType: String
+  reference: LOCATION.Address
+- label: address
+  dataType: String
+  reference: LOCATION.Address
+- label: residencyStartDate
+  dataType: Date
+  reference: PERSON.Person!0-LOCATION.Address
+- label: residencyEndDate
+  dataType: Date
+  reference: PERSON.Person!0-LOCATION.Address
+- label: parentSourceId
+  labelOverride: sourceId
+  dataType: String
+  reference: PERSON.Person!1
+- label: parent
+  labelOverride: name
+  dataType: String
+  reference: PERSON.Person!1
+- label: type
+  dataType: String
+  reference: PERSON.Person!0-PERSON.Person!1
+relationships:
+- label: RESIDES_AT
+  reference: PERSON.Person!0-LOCATION.Address
+  props:
+  - residencyStartDate
+  - residencyEndDate
+- label: PersonChildOfPerson
+  reference: PERSON.Person!0-PERSON.Person!1
+  props:
+  - type
+source:
+  sql: select * from testdb.default.test

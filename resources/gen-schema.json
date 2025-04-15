@@ -1,0 +1,70 @@
+[
+  {
+    "data_type": "string",
+    "field": "sourceId",
+    "source": "uuid"
+  },
+  {
+    "data_type": "int",
+    "field": "age",
+    "source": "randomUniformInt",
+    "config": {
+      "min": 0,
+      "max": 100
+    }
+  },
+  {
+    "data_type": "string",
+    "field": "name",
+    "source": "firstNames"
+  },
+  {
+    "data_type": "string",
+    "field": "addressId",
+    "source": "uuid"
+  },
+  {
+    "data_type": "string",
+    "field": "address",
+    "source": "randomAscii",
+    "config": {
+      "length": 40
+    }
+  },
+  {
+    "data_type": "string",
+    "field": "residencyStartDate",
+    "source": "randomDate",
+    "config": {
+      "min": "2000-01-01",
+      "max": "2013-01-01"
+    }
+  },
+  {
+    "data_type": "string",
+    "field": "residencyEndDate",
+    "source": "randomDate",
+    "config": {
+      "min": "2013-01-01",
+      "max": "2023-01-01"
+    }
+  },
+  {
+    "data_type": "string",
+    "field": "parentSourceId",
+    "source": "uuid"
+  },
+  {
+    "data_type": "string",
+    "field": "parent",
+    "source": "firstNames"
+  },
+  {
+    "data_type": "string",
+    "field": "type",
+    "source": "randomAscii",
+    "config": {
+      "length": 1
+    }
+  }
+]

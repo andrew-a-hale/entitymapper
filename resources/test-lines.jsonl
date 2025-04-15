@@ -1,12 +1,1 @@
-{
-  "sourceId": "1",
-  "age": 20,
-  "name": "Andrew",
-  "addressId": "1",
-  "address": "Home",
-  "residencyStartDate": "2024-01-01",
-  "residencyEndDate": "2024-12-12",
-  "parentSourceId": "2",
-  "parent": "John",
-  "type": "biological"
-}
+{ "sourceId": "1", "age": 20, "name": "Andrew", "addressId": "1", "address": "Home", "residencyStartDate": "2024-01-01", "residencyEndDate": "2024-12-12", "parentSourceId": "2", "parent": "John", "type": "biological" }

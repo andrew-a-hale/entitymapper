@@ -22,8 +22,6 @@ pub fn handle_file(path: &Path, mapping: &map::Schema) -> Option<RecordBatch> {
     }
 
     let buf = fs::read(path).unwrap();
-    let json_str = String::from_utf8(buf.clone());
-    println!("{:?}", json_str.unwrap());
 
     match path.extension() {
         Some(x) if x == "csv" => handle_csv(buf, mapping),
@@ -38,6 +36,7 @@ fn handle_csv(content: Vec<u8>, mapping: &map::Schema) -> Option<RecordBatch> {
     let buf = Cursor::new(content);
     let mut csv = arrow_csv::reader::ReaderBuilder::new(Arc::new(mapping.fields.clone()))
         .with_header(true)
+        .with_escape(b'"')
         .build(buf)
         .unwrap();
 
