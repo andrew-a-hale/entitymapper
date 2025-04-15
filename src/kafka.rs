@@ -40,7 +40,6 @@ impl data::Hook for Provider {
         let topic = self.get_topic();
         let record = FutureRecord::to(&topic).key(&msg.key).payload(&msg.value);
         block_on(self.producer.send(record, Duration::from_secs(0))).expect("failed to deliver");
-        println!("sent message: {}: {}", msg.key, msg.value);
 
         true
     }
